@@ -31,4 +31,8 @@ object Regex {
     def S(args: Any*) = { assert(sc.parts.size == 1); strSeq(sc.parts.head) }  // Character sequence from string
     def C(args: Any*) = { assert(sc.parts.size == 1); strAny(sc.parts.head) }  // Character class from string
   }
+
+  val Alpha = C"abcdefghijklmnopqrstuvwxyz"
+  val Digit = C"0123456789"
+  val AlphaDigit = Alpha | Digit
 }

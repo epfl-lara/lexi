@@ -3,8 +3,8 @@ package lexi
 import Predef.{augmentString => _, wrapString => _, _}
 
 object App {
-  private def process(regex: Regex): DFA = {
-    val nfa = NFA(regex)
+  private def process(tokenDefs: Map[Token, Regex]): DFA = {
+    val nfa = NFA(tokenDefs)
     println(nfa)
 
     val dfa = DFA(nfa)
@@ -21,7 +21,9 @@ object App {
 
   def main(args: Array[String]): Unit = {
     import Regex._
-    val r_aba = "ab".* & "a"
-    process(r_aba)
+    process(Map(
+      Token(1, "IF") -> "if",
+      Token(2, "ID") -> (Alpha & AlphaDigit.*)
+    ))
   }
 }

@@ -11,31 +11,39 @@ class State(val id: Int) extends AnyVal {
   override def toString(): String = s"($id)"
 }
 
+sealed abstract class Automaton[S] {
+  val states: List[State]
+  val alphabet: Set[Sym]
+  val trans: Map[(State, Sym), S]
+  val initState: State
+  val finalStates: Map[State, Token]
 
-object Automaton {
-  def checkValid[X](states: List[State], alphabet: Set[Sym],
-                    trans: Map[(State, Sym), X],
-                    initState: State, finalStates: List[State]): Unit = {
+  def checkValid(): Unit = {
     require(states contains initState)
-    require(finalStates.toSet subsetOf states.toSet)
+    require(finalStates.keySet subsetOf states.toSet)
     trans.keysIterator.foreach {
       case (_, EpsilonSym) =>
       case (_, c) => require(alphabet contains c)
     }
   }
-}
+  checkValid()
 
-
-case class DFA(states: List[State], alphabet: Set[Sym],
-               trans: Map[(State, Sym), State],
-               initState: State, finalStates: List[State])
-{
-  Automaton.checkValid(states, alphabet, trans, initState, finalStates)
+  def edges(): Iterable[(State, Sym, State)]
 
   def toGraphViz(): String = {
     def stateName(state: State) = s"S${state.id}"
-    val nodeDecls = finalStates.map(s => s"node [shape = doublecircle]; ${stateName(s)}")
-    val edgeDecls = trans.map { case ((s0, c), s1) => s"""${stateName(s0)} -> ${stateName(s1)} [ label = "$c" ]""" }
+    val nodeDecls = states.map { s =>
+      val name  = stateName(s)
+      val label = s""", label="$name""""
+      finalStates.get(s) match {
+        case None =>
+          s"""node [shape = circle$label ]; $name"""
+        case Some(token) =>
+          s"""node [shape = doublecircle$label, xlabel="${token.name}" ]; $name"""
+      }
+    }
+
+    val edgeDecls = edges.map { case (s0, c, s1) => s"""${stateName(s0)} -> ${stateName(s1)} [ label = "$c" ]""" }
     s"""
        |digraph fsm {
        |  rankdir=LR;
@@ -49,17 +57,31 @@ case class DFA(states: List[State], alphabet: Set[Sym],
        |}
      """.stripMargin
   }
+}
+
+
+case class DFA(states: List[State], alphabet: Set[Sym],
+               trans: Map[(State, Sym), State],
+               initState: State, finalStates: Map[State, Token]) extends Automaton[State]
+{
+  def edges() = trans.view.map { case ((s0, c), s1) => (s0, c, s1) }
 
   def minimized(): DFA = {
-    val finalStatesSet = finalStates.toSet
-    val partition = mutable.ArrayBuffer[Set[State]](finalStatesSet, states.toSet diff finalStatesSet)
+    val finalStatesSet = finalStates.keySet
+    val tokenStatesMap: Map[Token, Set[State]] =
+      finalStates.toList.groupBy(_._2).mapValues(_.map(_._1).toSet)
 
-    val invTrans = {
+    val partition = mutable.ArrayBuffer[Set[State]]()
+    partition.appendAll(tokenStatesMap.valuesIterator)
+    partition.append(states.toSet diff finalStatesSet)
+
+    val invTrans: Map[(State, Sym), Set[State]] = {
       for { ((s0, c), s1) <- trans.view }
         yield ((s1, c), s0)
     }.groupBy(_._1).mapValues(_.map(_._2).toSet)
 
-    var worklist = mutable.ArrayBuffer[Set[State]](finalStates.toSet)
+    var worklist = mutable.ArrayBuffer[Set[State]]()
+    worklist.appendAll(tokenStatesMap.valuesIterator)
     def pop(): Set[State] = {
       val n = worklist.length - 1
       val s = worklist.apply(n)
@@ -102,14 +124,23 @@ case class DFA(states: List[State], alphabet: Set[Sym],
     }
 
     println(partition)
-    val oldStateMap = partition.view.flatMap(ss => ss.view.map(_ -> ss)).toMap
-    val newStateMap = partition.view.map(_ -> freshState()).toMap
-    val oldToNew = oldStateMap andThen newStateMap
-    val transNew = {
+    val oldStateMap: Map[State, Set[State]] = partition.view.flatMap(ss => ss.view.map(_ -> ss)).toMap
+    val newStateMap: Map[Set[State], State] = partition.view.map(_ -> freshState()).toMap
+    val oldToNew: State => State            = oldStateMap andThen newStateMap
+
+    val transNew: Map[(State, Sym), State]  = {
       for {ss <- partition.view; c <- alphabet; oldS0 = ss.head }
         yield ((oldToNew(oldS0), c), oldToNew(trans(oldS0, c)))
     }.toMap
-    DFA(newStateMap.values.toList, alphabet, transNew, oldToNew(initState), finalStatesSet.map(oldToNew).toList)
+
+    val finalStatesNew: Map[State, Token]   = {
+      val set = finalStatesSet.map(s => (oldToNew(s), finalStates(s)))
+      val map = set.toMap
+      assert(set.size == map.size)  // During minimization no distinctions between tokens were lost
+      map
+    }
+
+    DFA(newStateMap.values.toList, alphabet, transNew, oldToNew(initState), finalStatesNew)
   }
 }
 
@@ -156,23 +187,31 @@ object DFA {
       edges = edges.filter { case ((s0, _), _) => s0 != sSink }
     }
 
-    val states         = stateMap.values.toList
-    val nfaFinalStates = nfa.finalStates.toSet
-    val finalStates    = stateMap.collect { case (ss, state) if ss.exists(nfaFinalStates.contains) => state }
-    DFA(states, nfa.alphabet, edges.toMap, stateMap(ssInit), finalStates.toList)
+    val states = stateMap.valuesIterator.toList
+    val finalStates = {
+      def findMaxToken(ss: Set[State]): Option[Token] =
+        ss.foldLeft(None: Option[Token]){
+          case (None, s)     => nfa.finalStates.get(s)
+          case (Some(t1), s) => nfa.finalStates.get(s).map(t2 => if (t1.id <= t2.id) t1 else t2).orElse(Some(t1))
+        }
+      for { (ss, state) <- stateMap; maxToken <- findMaxToken(ss) }
+        yield (state, maxToken)
+    }
+
+    DFA(states, nfa.alphabet, edges.toMap, stateMap(ssInit), finalStates)
   }
 }
 
 
 case class NFA(states: List[State], alphabet: Set[Sym],
                trans: Map[(State, Sym), List[State]],
-               initState: State, finalStates: List[State])
+               initState: State, finalStates: Map[State, Token]) extends Automaton[List[State]]
 {
-  Automaton.checkValid(states, alphabet, trans, initState, finalStates)
+  def edges() = trans.view.flatMap { case ((s0, c), ss1) => ss1.view.map(s1 => (s0, c, s1)) }
 }
 
 object NFA {
-  def apply(regex: Regex): NFA = {
+  def apply(tokenDefs: Map[Token, Regex]): NFA = {
     var states = List[State]()
     var alphabet = Set[Sym]()
 
@@ -225,7 +264,7 @@ object NFA {
     }
 
     val initState = freshState()
-    val finalStates = List[State](transform(initState, regex))
+    val finalStates = tokenDefs.map { case (token, regex) => transform(initState, regex) -> token }
     NFA(states, alphabet - EpsilonSym, edges.toMap, initState, finalStates)
   }
 }
