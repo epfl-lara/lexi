@@ -61,8 +61,6 @@ object App {
       val line = scala.io.StdIn.readLine()
       if (line == "X")
         running = false
-      else if (!line.toSet.subsetOf(ArithLang.alphabet))
-        println(s"Can only handle streams that fall within the language's alphabet!")
       else
         lexer(line) match {
           case Lexer.Success(tokens, chunks) =>
