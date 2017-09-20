@@ -3,30 +3,17 @@ package lexi
 import Predef.{augmentString => _, wrapString => _, _}
 
 object App {
-  private def compile(tokenDefs: Map[Token, Regex]): DFA = {
-    val nfa    = NFA(tokenDefs)
-    val dfa    = DFA(nfa)
-    val dfaMin = dfa.minimized()
-//    println(nfa)
-//    println(dfa)
-//    println(dfaMin)
-//    println(dfaMin.toGraphViz())
-    dfaMin
-  }
+  private def simpleLexerTest(): Unit =
+  {
+    object TestLexerDef extends LexerDef {
+      import Regex._
+      val IF   = "IF"   := "if"
+      val ID   = "ID"   := (Alpha ~ AlphaDigit.*)
+      val SPEC = "SPEC" := "-special"
+      val WS   = "WS"   := C" ".+
+    }
 
-  def main(args: Array[String]): Unit = {
-    import Regex._
-
-    val dfa = compile(Map(
-      Token(1, "IF")   -> "if",
-      Token(2, "ID")   -> (Alpha ~ AlphaDigit.*),
-      Token(3, "SPEC") -> "-special",
-      Token(4, "WS")   -> C" ".+,
-      ErrorToken       -> (AlphaDigit | C" -")
-    ))
-
-//    println(dfa)
-    val lexer = Lexer(dfa)
+    val lexer = TestLexerDef.toLexer
 
     assert(lexer("if i were there").isSuccess == true)
     assert(lexer("3a ").isSuccess             == false)
@@ -41,5 +28,54 @@ object App {
       assert(tokens.length == 7)
       assert(chunks.mkString("") == "if i were there")
     }
+  }
+
+  private def interact(): Unit =
+  {
+    object ArithLang extends LexerDef {
+      import Regex._
+      val IF      = "IF"      := "if"
+      val THEN    = "THEN"    := "then"
+      val ELSE    = "ELSE"    := "else"
+      val ID      = "ID"      := (Alpha ~ AlphaDigit.*)
+      val NUM     = "NUM"     := Digit.+
+      val LPAREN  = "LPAREN"  := "("
+      val RPAREN  = "RPAREN"  := ")"
+      val PLUS    = "PLUS"    := "+"
+      val MINUS   = "MINUS"   := "-"
+      val MUL     = "MUL"     := "*"
+      val GT      = "GT"      := ">"
+      val EQ      = "EQ"      := "="
+      val NOT     = "NOT"     := "!"
+      val OR      = "OR"      := "||"
+      val AND     = "AND"     := "&&"
+      val WS      = "WS"      := C" ".+
+    }
+
+    val lexer = ArithLang.toLexer
+
+    var running = true
+    println(s"Ready to lex.")
+    do {
+      import Predef.wrapString
+      val line = scala.io.StdIn.readLine()
+      if (line == "X")
+        running = false
+      else if (!line.toSet.subsetOf(ArithLang.alphabet))
+        println(s"Can only handle streams that fall within the language's alphabet!")
+      else
+        lexer(line) match {
+          case Lexer.Success(tokens, chunks) =>
+            println(s"=>  ${tokens.mkString(", ")}")
+          case Lexer.Failure(msg) =>
+            println(s"!!  $msg")
+        }
+
+    } while (running)
+  }
+
+  def main(args: Array[String]): Unit = {
+    simpleLexerTest()
+    interact()
   }
 }

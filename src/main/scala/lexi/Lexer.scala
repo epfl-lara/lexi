@@ -72,3 +72,31 @@ object Lexer {
   case class Success(tokens: List[Token], chunks: List[String]) extends Result { val isSuccess = true }
   case class Failure(msg: String) extends Result { val isSuccess = false }
 }
+
+
+abstract class LexerDef {
+  private var tokenDefs = Map.empty[Token, Regex]
+  private var frozen = false
+
+  implicit class TokenHelper(tokenName: String) {
+    def :=(regex: Regex): Token = {
+      assert(!frozen, s"LexerDef cannot be modified once it has been frozen")
+      val token = lexi.Token(tokenDefs.size + 1, tokenName)
+      tokenDefs = tokenDefs.updated(token, regex)
+      token
+    }
+  }
+
+  lazy val alphabet: Set[Sym] = {
+    frozen = true
+    tokenDefs.valuesIterator.toSet.flatMap((r: Regex) => r.alphabet)
+  }
+
+  lazy val toLexer: Lexer = {
+    frozen = true
+    val catchallRegex = Regex.Element(alphabet)
+    val tokenDefs1 = tokenDefs + (ErrorToken -> catchallRegex)
+    val dfa = DFA(NFA(tokenDefs1)).minimized()
+    Lexer(dfa)
+  }
+}

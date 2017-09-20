@@ -10,6 +10,14 @@ sealed trait Regex {
   def |(other: Regex): Alt    = Alt(this, other)
   def *(): Star               = Star(this)
   def +(): Regex              = this ~ this.*
+
+  def alphabet: Set[Sym] = this match {
+    case Epsilon        => Set.empty
+    case Element(syms)  => syms
+    case Concat(r1, r2) => r1.alphabet union r2.alphabet
+    case Alt(r1, r2)    => r1.alphabet union r2.alphabet
+    case Star(r)        => r.alphabet
+  }
 }
 
 object Regex {
