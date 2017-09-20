@@ -6,10 +6,10 @@ package lexi
 sealed trait Regex {
   import Regex._
 
-  def &(other: Regex): Concat = Concat(this, other)
+  def ~(other: Regex): Concat = Concat(this, other)
   def |(other: Regex): Alt    = Alt(this, other)
   def *(): Star               = Star(this)
-  def +(): Regex              = this & this.*
+  def +(): Regex              = this ~ this.*
 }
 
 object Regex {

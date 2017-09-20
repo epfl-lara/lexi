@@ -123,7 +123,6 @@ case class DFA(states: List[State], alphabet: Set[Sym],
       state
     }
 
-    println(partition)
     val oldStateMap: Map[State, Set[State]] = partition.view.flatMap(ss => ss.view.map(_ -> ss)).toMap
     val newStateMap: Map[Set[State], State] = partition.view.map(_ -> freshState()).toMap
     val oldToNew: State => State            = oldStateMap andThen newStateMap
@@ -142,6 +141,12 @@ case class DFA(states: List[State], alphabet: Set[Sym],
 
     DFA(newStateMap.values.toList, alphabet, transNew, oldToNew(initState), finalStatesNew)
   }
+
+  /** Returns the first state for which every transition loops back to itself.
+    * (We only generate DFAs with at most one such state.)
+    */
+  def findDeadState(): Option[State] =
+    states.find { s0 => alphabet.forall( c => trans(s0, c) == s0 ) }
 }
 
 object DFA {
@@ -192,7 +197,7 @@ object DFA {
       def findMaxToken(ss: Set[State]): Option[Token] =
         ss.foldLeft(None: Option[Token]){
           case (None, s)     => nfa.finalStates.get(s)
-          case (Some(t1), s) => nfa.finalStates.get(s).map(t2 => if (t1.id <= t2.id) t1 else t2).orElse(Some(t1))
+          case (Some(t1), s) => nfa.finalStates.get(s).map(t2 => t1 min t2).orElse(Some(t1))
         }
       for { (ss, state) <- stateMap; maxToken <- findMaxToken(ss) }
         yield (state, maxToken)
