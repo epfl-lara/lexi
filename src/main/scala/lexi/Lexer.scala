@@ -78,13 +78,16 @@ object Lexer {
 
 abstract class LexerDef {
   private var tokenDefs = Map.empty[Token, Regex]
+  private var tokenNameMap = Map.empty[String, Token]
   private var frozen = false
 
   implicit class TokenHelper(tokenName: String) {
     def :=(regex: Regex): Token = {
       assert(!frozen, s"LexerDef cannot be modified once it has been frozen")
+      assert(!tokenNameMap.contains(tokenName), s"Cannot define multiple tokens of the same name: $tokenName")
       val token = lexi.Token(tokenDefs.size + 1, tokenName)
       tokenDefs = tokenDefs.updated(token, regex)
+      tokenNameMap = tokenNameMap.updated(tokenName, token)
       token
     }
   }

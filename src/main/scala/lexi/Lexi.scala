@@ -34,22 +34,22 @@ object App {
   {
     object ArithLang extends LexerDef {
       import Regex._
-      val IF      = "IF"      := "if"
-      val THEN    = "THEN"    := "then"
-      val ELSE    = "ELSE"    := "else"
-      val ID      = "ID"      := (Alpha ~ AlphaDigit.*)
-      val NUM     = "NUM"     := Digit.+
-      val LPAREN  = "LPAREN"  := "("
-      val RPAREN  = "RPAREN"  := ")"
-      val PLUS    = "PLUS"    := "+"
-      val MINUS   = "MINUS"   := "-"
-      val MUL     = "MUL"     := "*"
-      val GT      = "GT"      := ">"
-      val EQ      = "EQ"      := "="
-      val NOT     = "NOT"     := "!"
-      val OR      = "OR"      := "||"
-      val AND     = "AND"     := "&&"
-      val WS      = "WS"      := C" ".+
+      "IF"      := "if"
+      "THEN"    := "then"
+      "ELSE"    := "else"
+      "ID"      := (Alpha ~ AlphaDigit.*)
+      "NUM"     := Digit.+
+      "LPAREN"  := "("
+      "RPAREN"  := ")"
+      "PLUS"    := "+"
+      "MINUS"   := "-"
+      "MUL"     := "*"
+      "GT"      := ">"
+      "EQ"      := "="
+      "NOT"     := "!"
+      "OR"      := "||"
+      "AND"     := "&&"
+      "WS"      := C" ".+
     }
 
     val lexer = ArithLang.toLexer
@@ -59,7 +59,7 @@ object App {
     do {
       import Predef.wrapString
       val line = scala.io.StdIn.readLine()
-      if (line == "X")
+      if (line == null)
         running = false
       else
         lexer(line) match {
