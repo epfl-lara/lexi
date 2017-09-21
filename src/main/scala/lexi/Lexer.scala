@@ -62,7 +62,7 @@ class Lexer(dfa: DFA) {
         fail(pos, pos+1)
     }
 
-    if (failure.isEmpty)
+    if (failure.isEmpty && input.nonEmpty)
       finishChunk()
 
     failure getOrElse Success(tokens.reverse, chunks.reverse)
@@ -70,8 +70,6 @@ class Lexer(dfa: DFA) {
 }
 
 object Lexer {
-  def apply(dfa: DFA): Lexer = new Lexer(dfa)
-
   sealed trait Result { val isSuccess: Boolean }
   case class Success(tokens: List[Token], chunks: List[String]) extends Result { val isSuccess = true }
   case class Failure(msg: String) extends Result { val isSuccess = false }
@@ -101,6 +99,6 @@ abstract class LexerDef {
     val catchallRegex = Regex.Element(alphabet)
     val tokenDefs1 = tokenDefs + (ErrorToken -> catchallRegex)
     val dfa = DFA(NFA(tokenDefs1)).minimized()
-    Lexer(dfa)
+    new Lexer(dfa)
   }
 }
